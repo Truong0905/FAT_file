@@ -30,12 +30,11 @@ static uint16_t APP_Selection(const uint16_t sumSeclect);
 /**  APP_SelectiontHandler
  * @brief      Selection Handler
  * @param[in] select  User's choice
- * @param[in] sumByteOfCluster  Total bytes of a cluster. Smallest unit for reading data
  * @param[in] headNodeEntry  head of list entries
  * @param[out] subDriect  Check if user chooses folder or file
  * @return uint32_t Returns the first cluster of the selected entry. Used to open a new folder if the user selects a folder
  */
-static uint32_t APP_SelectiontHandler(const uint16_t select, const uint16_t sumByteOfCluster, const FATFS_ListEntry_struct_t *const headNodeEntry, bool *const subDriect);
+static uint32_t APP_SelectiontHandler(const uint16_t select, const FATFS_ListEntry_struct_t *const headNodeEntry, bool *const subDriect);
 
 /*******************************************************************************
  * Code
@@ -43,17 +42,17 @@ static uint32_t APP_SelectiontHandler(const uint16_t select, const uint16_t sumB
 
 void APP_MainMenu(void)
 {
-    uint8_t *path = "floppy.img"; /* file path of FAT file system */
+    uint8_t *path = "Fat32.img"; /* file path of FAT file system */
     FATFS_ListEntry_struct_t *headNodeEntry = NULL;
     uint16_t sumSeclect = 0;
     uint16_t select = 0;
-    uint16_t sumByteOfCluster = 0;
+    bool check = true;
     uint32_t locationForReadEntry = 0;
     bool subDriect = false;
 
-    sumByteOfCluster = FATFS_Init(path);
+    check = FATFS_Init(path);
 
-    if (0 != sumByteOfCluster)
+    if (false != check)
     {
         headNodeEntry = FATFS_ReadDirectory(0); /*Read root directory*/
     }
@@ -75,7 +74,7 @@ void APP_MainMenu(void)
             }
             else
             {
-                locationForReadEntry = APP_SelectiontHandler(select, sumByteOfCluster, headNodeEntry, &subDriect);
+                locationForReadEntry = APP_SelectiontHandler(select, headNodeEntry, &subDriect);
 
                 if (true == subDriect)
                 {
@@ -194,7 +193,7 @@ static uint16_t APP_Selection(const uint16_t sumSeclect)
     return select;
 }
 
-static uint32_t APP_SelectiontHandler(const uint16_t select, const uint16_t sumByteOfCluster, const FATFS_ListEntry_struct_t *const headNodeEntry, bool *const subDriect)
+static uint32_t APP_SelectiontHandler(const uint16_t select, const FATFS_ListEntry_struct_t *const headNodeEntry, bool *const subDriect)
 {
     uint8_t *buffer = NULL;
     uint16_t i = 0;
@@ -202,9 +201,6 @@ static uint32_t APP_SelectiontHandler(const uint16_t select, const uint16_t sumB
     uint32_t positionOfcluster = 0;
     const FATFS_ListEntry_struct_t *temp = NULL;
     uint32_t locationForReadEntry = 0;
-    bool statusStart = true;
-    bool statusNext = true;
-
     temp = headNodeEntry;
 
     for (i = 1; i < select; i++)
@@ -215,30 +211,17 @@ static uint32_t APP_SelectiontHandler(const uint16_t select, const uint16_t sumB
     {
         if (0 != temp->entry.fileSize)
         {
-            buffer = (uint8_t *)malloc(sumByteOfCluster);
             positionOfcluster = temp->entry.firstCluster;
-            statusNext = FATFS_ReadData(&positionOfcluster, buffer);
+            FATFS_ReadData(positionOfcluster, temp->entry.fileSize, &buffer);
 
             printf("\n");
-            while (true == statusStart)
+            for (i = 0; i < temp->entry.fileSize; i++)
             {
-
-                for (i = 0; i < sumByteOfCluster; i++)
-                {
-                    printf("%c", buffer[i]);
-                }
-
-                if (true == statusNext)
-                {
-                    statusNext = FATFS_ReadData(&positionOfcluster, buffer);
-                }
-                else
-                {
-                    statusStart = false;
-                }
+                printf("%c", buffer[i]);
             }
-            free(buffer);
-            buffer = NULL;
+            printf("%.*s", temp->entry.fileSize, buffer);
+
+            buffer= (uint8_t *)realloc(buffer,0);
         }
         else
         {

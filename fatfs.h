@@ -60,9 +60,9 @@ typedef struct __FATFS_ListEntry_struct_t
 /**  FATFS_Init
  * @brief Open the file FAT and store information in the boot sector
  * @param[in] filePath   The path to the file
- * @return uint16_t Returns the number of bytes per cluster (if zero, initialization fails)
+ * @return if success then returns true
  */
-uint16_t FATFS_Init(const uint8_t *const filePath);
+bool FATFS_Init(const uint8_t *const filePath);
 
 /**  FATFS_ReadDirectory
  * @brief Read root directory or sub directory
@@ -73,12 +73,11 @@ FATFS_ListEntry_struct_t *FATFS_ReadDirectory(const uint32_t locationToRead);
 
 /**  FATFS_ReadData
  * @brief Read data at specified cluster
- * @param[inout] positionOfcluster   Cluster location to read
+ * @param[in] firstCluster   position of first cluster
+* @param[in] sizeDataToRead   size data
  * @param[out] buffer   Receiver array
- * @return bool If there is data in the next cluster, return true
  */
-bool FATFS_ReadData(uint32_t *const positionOfcluster, uint8_t *const buffer);
-
+void FATFS_ReadData(uint32_t firstCluster,uint32_t const sizeDataToRead, uint8_t **buffer);
 /**  FATFS_DeInit
  * @brief Close the file FAT
  * @return none

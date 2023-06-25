@@ -144,7 +144,7 @@ static bool FATFS_ProcessMainEntry(const uint8_t *const buffer, FATFS_ListEntry_
  * Code
  ******************************************************************************/
 
-uint16_t FATFS_Init(const uint8_t const *filePath)
+bool FATFS_Init(const uint8_t const *filePath)
 {
     uint8_t bufferForBoot[512]; /*Read the first 512 bytes information of boot sector */
     uint8_t *bufferOfFat = NULL;
@@ -155,7 +155,7 @@ uint16_t FATFS_Init(const uint8_t const *filePath)
     uint32_t totalSectors = 0;     /*Total number of sectors of the file*/
     uint16_t totalClusters = 0;    /*Total number of clusters of the file*/
     uint16_t sumEntryOfRoot = 0;   /*Total number of entries of the root directory*/
-    uint16_t sumByteOfCluster = 0; /*return value */
+    bool returnValue = true;       /*Return value*/
 
     /*Read boot sector ( in sector 0) */
     if ((true == HAL_Init(filePath)) && (512 == HAL_ReadSector(0, bufferForBoot)))
@@ -256,16 +256,14 @@ uint16_t FATFS_Init(const uint8_t const *filePath)
             }
         }
 
-        /*Return value*/
-        sumByteOfCluster = s_InformationOfFatFs.bytePerSector * s_InformationOfFatFs.sectorPerCluster;
     }
     else
     {
         /*Error*/
-        sumByteOfCluster = 0;
+        returnValue = false;
     }
 
-    return sumByteOfCluster;
+    return returnValue;
 }
 
 FATFS_ListEntry_struct_t *FATFS_ReadDirectory(const uint32_t locationToRead)
@@ -462,27 +460,25 @@ FATFS_ListEntry_struct_t *FATFS_ReadDirectory(const uint32_t locationToRead)
     return returnListEntry;
 }
 
-bool FATFS_ReadData(uint32_t *const positionOfcluster, uint8_t *const buffer)
+void FATFS_ReadData(uint32_t firstCluster,uint32_t const sizeDataToRead, uint8_t **buffer)
 {
     uint32_t locationOfSelected = 0; /*Start sector position to read*/
-    bool status = true;              /*return value */
+    uint32_t sumBytePerCluster = s_InformationOfFatFs.bytePerSector * s_InformationOfFatFs.sectorPerCluster;
+    uint32_t index = 0;
+    uint32_t totalCluster = 0;
 
-    /*Read data of cluster (*positionOfcluster) */
-    locationOfSelected = s_InformationOfFatFs.locationOfData + (*positionOfcluster - 2) * s_InformationOfFatFs.sectorPerCluster; /*Because the data area starts to be used from cluster 2. So must be subtracted*/
-    HAL_ReadMultiSector(locationOfSelected, s_InformationOfFatFs.sectorPerCluster, buffer);
+     totalCluster = sizeDataToRead/sumBytePerCluster + ((sizeDataToRead % sumBytePerCluster) !=0);
+    *buffer = (uint8_t *)malloc(sumBytePerCluster*totalCluster);
 
-    /*Check next cluster*/
-    *positionOfcluster = s_BufferForFat[*positionOfcluster];
-    if (s_EndOfFile != *positionOfcluster)
+    do
     {
-        status = true;
-    }
-    else
-    {
-        status = false;
-    }
+          /*Read data of cluster */
+        locationOfSelected = s_InformationOfFatFs.locationOfData + (firstCluster - 2) * s_InformationOfFatFs.sectorPerCluster; /*Because the data area starts to be used from cluster 2. So must be subtracted*/
+        HAL_ReadMultiSector(locationOfSelected, s_InformationOfFatFs.sectorPerCluster,(*buffer + index) );
+        firstCluster = s_BufferForFat[firstCluster];
+        index+= sumBytePerCluster;
+    } while (s_EndOfFile != firstCluster);
 
-    return status;
 }
 
 void FATFS_DeInit(void)
@@ -650,7 +646,7 @@ static bool FATFS_ProcessMainEntry(const uint8_t *const buffer, FATFS_ListEntry_
         node->entry.firstCluster = FATFS_CONVERT_2_BYTES(&buffer[FATFS_LOW_WORD_OF_ADDRESS_CLUSTER_OFFSET]);
         node->entry.firstCluster |= (FATFS_CONVERT_2_BYTES(&buffer[FATFS_HIGH_WORD_OF_ADDRESS_CLUSTER_OFFSET])) << 16;
         /*size of file ( folder)*/
-        node->entry.fileSize = FATFS_CONVERT_2_BYTES(&buffer[FATFS_FILE_SIZE_OFFSET]);
+        node->entry.fileSize = FATFS_CONVERT_4_BYTES(&buffer[FATFS_FILE_SIZE_OFFSET]);
 
         status = true;
     }
